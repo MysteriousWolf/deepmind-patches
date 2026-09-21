@@ -35,10 +35,6 @@ What kind of bump a change needs.
 
 **Trait Implementations:**
 
-- **Serialize**
-  - `fn serialize<__S>(self: &Self, __serializer: __S) -> _serde::__private229::Result<<__S as >::Ok, <__S as >::Error>`
-- **Ord**
-  - `fn cmp(self: &Self, other: &Self) -> $crate::cmp::Ordering`
 - **PartialEq**
   - `fn eq(self: &Self, other: &Self) -> bool`
 - **Clone**
@@ -51,6 +47,10 @@ What kind of bump a change needs.
   - `fn partial_cmp(self: &Self, other: &Self) -> $crate::option::Option<$crate::cmp::Ordering>`
 - **Debug**
   - `fn fmt(self: &Self, f: & mut $crate::fmt::Formatter) -> $crate::fmt::Result`
+- **Serialize**
+  - `fn serialize<__S>(self: &Self, __serializer: __S) -> _serde::__private229::Result<<__S as >::Ok, <__S as >::Error>`
+- **Ord**
+  - `fn cmp(self: &Self, other: &Self) -> $crate::cmp::Ordering`
 
 
 
@@ -97,19 +97,12 @@ A library version.
 - `fn tag(self: &Self) -> String` - The tag a version is released under: `v26.1.0`.
 - `fn from_tag(tag: &str) -> Result<Self, Error>` - Parses a tag, with or without the `v`.
 - `fn next(self: Self, bump: Bump, year: u32) -> Self` - The next version after a bump, given the current two-digit year.
+- `fn step_to(self: Self, next: Self, year: u32) -> Result<Bump, Error>` - The bump that takes `self` to `next`, if `next` is exactly one step
 
 **Traits:** Eq, Copy
 
 **Trait Implementations:**
 
-- **Hash**
-  - `fn hash<__H>(self: &Self, state: & mut __H)`
-- **PartialOrd**
-  - `fn partial_cmp(self: &Self, other: &Self) -> $crate::option::Option<$crate::cmp::Ordering>`
-- **Deserialize**
-  - `fn deserialize<D>(deserializer: D) -> Result<Self, <D as >::Error>`
-- **Display**
-  - `fn fmt(self: &Self, f: & mut fmt::Formatter) -> fmt::Result`
 - **Debug**
   - `fn fmt(self: &Self, f: & mut $crate::fmt::Formatter) -> $crate::fmt::Result`
 - **Default**
@@ -124,6 +117,14 @@ A library version.
   - `fn eq(self: &Self, other: &Self) -> bool`
 - **Clone**
   - `fn clone(self: &Self) -> Self`
+- **Hash**
+  - `fn hash<__H>(self: &Self, state: & mut __H)`
+- **PartialOrd**
+  - `fn partial_cmp(self: &Self, other: &Self) -> $crate::option::Option<$crate::cmp::Ordering>`
+- **Deserialize**
+  - `fn deserialize<D>(deserializer: D) -> Result<Self, <D as >::Error>`
+- **Display**
+  - `fn fmt(self: &Self, f: & mut fmt::Formatter) -> fmt::Result`
 
 
 
