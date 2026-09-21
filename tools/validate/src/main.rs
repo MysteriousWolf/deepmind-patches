@@ -137,7 +137,6 @@ enum BumpArg {
     Auto,
     Patch,
     Release,
-    Year,
 }
 
 fn main() -> ExitCode {
@@ -474,7 +473,6 @@ fn next_version(root: &Path, bump: BumpArg) -> Result<LibraryVersion, String> {
     let bump = match bump {
         BumpArg::Patch => Bump::Patch,
         BumpArg::Release => Bump::Release,
-        BumpArg::Year => Bump::Year,
         BumpArg::Auto => {
             let tag = latest.as_deref().unwrap_or_default();
             let changes = git::changes(root, tag)?;

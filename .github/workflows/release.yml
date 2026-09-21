@@ -4,10 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       bump:
-        description: Which part to bump. auto reads it from the changes since the last tag.
+        description: Which part to bump. auto reads it from the changes since the last tag. The year is always taken from the date.
         type: choice
         default: auto
-        options: [auto, patch, release, year]
+        options: [auto, release, patch]
 
 permissions:
   contents: write
@@ -37,26 +37,31 @@ jobs:
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
           echo "Releasing v$VERSION (previous: ${PREVIOUS:-none})"
 
+      # Everything built goes to the runner's temp folder. The validator
+      # refuses files it does not know at the checkout root, and the notes
+      # step validates the checkout again.
       - name: Build the index
         run: >
           target/release/validate index
-          --out index.toml
+          --out "$RUNNER_TEMP/index.toml"
           --version "${{ steps.version.outputs.version }}"
           --commit "$GITHUB_SHA"
 
       - name: Bundle
         run: |
-          tar czf patches.tar.gz presets
-          tar czf demos.tar.gz demos
+          tar czf "$RUNNER_TEMP/patches.tar.gz" presets
+          tar czf "$RUNNER_TEMP/demos.tar.gz" demos
 
       - name: Write the notes
         run: |
           if [ -n "${{ steps.version.outputs.previous }}" ]; then
-            target/release/validate notes --since "${{ steps.version.outputs.previous }}" --version "${{ steps.version.outputs.version }}" > notes.md
+            SINCE="--since ${{ steps.version.outputs.previous }}"
           else
-            target/release/validate notes --version "${{ steps.version.outputs.version }}" > notes.md
+            SINCE=""
           fi
-          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+          # shellcheck disable=SC2086
+          target/release/validate notes $SINCE --version "${{ steps.version.outputs.version }}" > "$RUNNER_TEMP/notes.md"
+          cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish the release
         env:
@@ -66,8 +71,8 @@ jobs:
           gh release create "$TAG" \
             --target "$GITHUB_SHA" \
             --title "$TAG" \
-            --notes-file notes.md \
-            index.toml patches.tar.gz demos.tar.gz
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            "$RUNNER_TEMP/index.toml" "$RUNNER_TEMP/patches.tar.gz" "$RUNNER_TEMP/demos.tar.gz"
 
       # The crate has its own version. It is published when the version in
       # its Cargo.toml is not on crates.io yet, so a release that changed no

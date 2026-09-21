@@ -28,8 +28,8 @@ holding last week's index fetches last week's files, never a mixture.
 `main` is always releasable: every merge passed the validator. A release is a
 manual step so several pull requests can batch into one:
 
-1. Run the **Release** workflow. Leave the bump on `auto`, or force `patch`,
-   `release` or `year`.
+1. Run the **Release** workflow. Leave the bump on `auto`, or force `release`
+   or `patch`. The year is taken from the date.
 2. The workflow validates, computes the next version from the last tag and
    the changes since, builds the index and the archives, writes notes listing
    added and updated patches, and publishes the release under the new tag.
