@@ -697,7 +697,6 @@ dependencies = [
  "clap",
  "deepmind-midi",
  "deepmind-patches",
- "serde",
  "toml",
 ]
 
