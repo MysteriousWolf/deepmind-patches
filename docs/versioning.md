@@ -1,23 +1,25 @@
 # Versioning
 
-## The library
+## The version
 
-Releases are tagged `vYY.RELEASE.PATCH`, for example `v26.3.1`.
+There is one version, `package.version` in `crates/deepmind-patches/Cargo.toml`.
+It is the library's, the crate's and the release tag's: `26.3.1` in the file
+is `v26.3.1` on GitHub and `26.3.1` on crates.io.
 
 | Part | Bumps when |
 | --- | --- |
-| `YY` | The first release of a year. Resets the other two to 0. |
-| `RELEASE` | New patches were added. Resets `PATCH` to 0. |
-| `PATCH` | Only existing patches, demos, taxonomy or resources changed. |
+| `YY` | The first release of a year, from the date. Resets the other two to 0. Also a breaking change to the crate's API. |
+| `RELEASE` | New patches were added, or something public was added to the crate. Resets `PATCH` to 0. |
+| `PATCH` | Existing patches, demos, taxonomy, resources or crate code changed without adding anything. |
 
-The version lives in git tags, not in a file, so a contribution never edits a
-shared version line and never conflicts with another one. CI classifies each
-pull request as `release`, `patch` or `none` from the paths it touches, and the
-release workflow computes the next tag from everything merged since the last
-one. A maintainer can force a bump when cutting a release.
+Every pull request that changes something that ships bumps the version, in
+the same pull request. CI works out the least bump the change needs from the
+paths it touches, refuses a smaller one, and refuses a version that is already
+tagged or on crates.io. Bumping the version changes `Cargo.lock` too; run
+`cargo check` after editing it.
 
-Tooling, workflows and docs need no bump. The `deepmind-patches` crate has its
-own version on the same scheme, on its own counter.
+Workflows, docs and the tool under `tools/` need no bump. Merging to `main`
+releases whatever version is not tagged yet.
 
 ## A patch
 

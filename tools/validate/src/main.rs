@@ -14,7 +14,7 @@ use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use deepmind_midi::ParamId;
 use deepmind_midi::ids::{Bank, DeviceId, ProgramNumber, ProtocolVersion};
 use deepmind_midi::program::{Program, ProgramName};
@@ -48,27 +48,17 @@ enum Command {
         #[arg(long)]
         github: bool,
     },
-    /// Checks per-patch versions against a base ref and reports the bump the
-    /// change needs. Exit 1 when a changed .syx did not bump its version.
+    /// Checks every version against a base ref: each changed patch bumped
+    /// its own version, and the version in crates/deepmind-patches/Cargo.toml
+    /// moved by at least what the change needs. Exit 1 when either did not.
     Versioning {
         /// The ref to compare with, usually origin/main.
         #[arg(long)]
         base: String,
     },
-    /// Checks the crate's version against a base ref: a change under
-    /// crates/deepmind-patches must bump it by exactly one step. Exit 1
-    /// when it did not.
-    CrateVersion {
-        /// The ref to compare with, usually origin/main.
-        #[arg(long)]
-        base: String,
-    },
-    /// Prints the next library version from the tags and the changes since.
-    NextVersion {
-        /// Force a bump instead of computing one.
-        #[arg(long, default_value = "auto")]
-        bump: BumpArg,
-    },
+    /// Prints the version in crates/deepmind-patches/Cargo.toml, which is the
+    /// version of everything.
+    Version,
     /// Builds index.toml from a valid checkout.
     Index {
         /// Where to write.
@@ -132,14 +122,6 @@ enum Command {
     },
 }
 
-#[derive(Clone, Copy, ValueEnum)]
-enum BumpArg {
-    Auto,
-    Patch,
-    Release,
-    Year,
-}
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match run(cli) {
@@ -159,9 +141,8 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
     match cli.command {
         Command::Check { strict, github } => check(&root, strict, github),
         Command::Versioning { base } => versioning(&root, &base),
-        Command::CrateVersion { base } => crate_version(&root, &base),
-        Command::NextVersion { bump } => {
-            println!("{}", next_version(&root, bump)?);
+        Command::Version => {
+            println!("{}", current_version(&root)?);
             Ok(ExitCode::SUCCESS)
         }
         Command::Index {
@@ -290,12 +271,9 @@ fn side_at(
 
 fn versioning(root: &Path, base: &str) -> Result<ExitCode, String> {
     let changes = git::changes(root, base)?;
-    let bump = classify(
-        changes
-            .iter()
-            .map(|(change, path)| (*change, path.as_path())),
-    );
     let mut failed = false;
+
+    // Each changed patch bumped its own version if its bytes changed.
     let mut seen = std::collections::BTreeSet::new();
     for (change, path) in &changes {
         if !path.starts_with(deepmind_patches::PRESETS_DIR) || *change == Change::Deleted {
@@ -342,17 +320,112 @@ fn versioning(root: &Path, base: &str) -> Result<ExitCode, String> {
             }
         }
     }
-    let label = match bump {
-        Bump::None => "none",
-        Bump::Patch => "patch",
-        Bump::Release => "release",
-        Bump::Year => "year",
+
+    // The one version moved by at least what the change needs.
+    let manifest_path = Path::new(CRATE_DIR).join("Cargo.toml");
+    let file = manifest_path.display();
+    let head = current_version(root)?;
+    let before = git::show(root, base, &manifest_path)?
+        .map(|text| manifest_version(&text))
+        .transpose()?;
+    let content = classify(
+        changes
+            .iter()
+            .map(|(change, path)| (*change, path.as_path())),
+    );
+    // The version line lives in the crate, so a bump alone is not a code
+    // change. Anything else under the crate, or any other edit to its
+    // manifest, is.
+    let manifest_changed_beyond_version = match &before {
+        Some(_) => {
+            let before_text = git::show(root, base, &manifest_path)?.unwrap_or_default();
+            let head_text = std::fs::read(root.join(&manifest_path)).unwrap_or_default();
+            without_version_line(&before_text) != without_version_line(&head_text)
+        }
+        None => true,
     };
+    let code_changed = changes.iter().any(|(_, path)| {
+        path.starts_with(CRATE_DIR) && (path != &manifest_path || manifest_changed_beyond_version)
+    });
+    let required = if code_changed {
+        content.max(Bump::Patch)
+    } else {
+        content
+    };
+    let year = current_year();
+    let step = match before {
+        None => Bump::Release,
+        Some(before) if before == head => {
+            if required != Bump::None {
+                failed = true;
+                let mut expected = format!(
+                    "{} for a fix or {} for an addition",
+                    head.next(Bump::Patch, head.year),
+                    head.next(Bump::Release, head.year),
+                );
+                if year > head.year {
+                    expected = format!("{} to start the year", head.next(Bump::Year, year));
+                }
+                println!(
+                    "::error file={file}::this change needs a {} bump but version is still {head}. Set version = {expected}, then run cargo check so Cargo.lock follows.",
+                    bump_label(required)
+                );
+            }
+            Bump::None
+        }
+        Some(before) => match before.step_to(head, year) {
+            Ok(step) => {
+                if year > before.year && step != Bump::Year {
+                    failed = true;
+                    println!(
+                        "::error file={file}::the year moved on; the next version is {}, not {head}.",
+                        before.next(Bump::Year, year)
+                    );
+                }
+                if step < required {
+                    failed = true;
+                    println!(
+                        "::error file={file}::this change needs a {} bump but {before} to {head} is a {} bump. Set version = {}.",
+                        bump_label(required),
+                        bump_label(step),
+                        before.next(required, year)
+                    );
+                }
+                if required == Bump::None {
+                    println!(
+                        "::warning file={file}::version went from {before} to {head} but nothing that ships changed. Merging still releases it."
+                    );
+                }
+                step
+            }
+            Err(error) => {
+                failed = true;
+                println!("::error file={file}::{error}");
+                Bump::None
+            }
+        },
+    };
+    let changelog_changed = changes
+        .iter()
+        .any(|(_, path)| path == Path::new("CHANGELOG.md"));
+    if code_changed && !changelog_changed {
+        println!(
+            "::warning file=CHANGELOG.md::{CRATE_DIR} changed without a line in CHANGELOG.md."
+        );
+    }
+
+    let label = bump_label(step);
+    println!("version={head}");
     println!("bump={label}");
+    println!("needs={}", bump_label(required));
+    println!("code_changed={code_changed}");
     if let Ok(output) = std::env::var("GITHUB_OUTPUT") {
         use std::io::Write as _;
         if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(output) {
+            let _ = writeln!(file, "version={head}");
             let _ = writeln!(file, "bump={label}");
+            let _ = writeln!(file, "needs={}", bump_label(required));
+            let _ = writeln!(file, "code_changed={code_changed}");
         }
     }
     Ok(if failed {
@@ -362,10 +435,27 @@ fn versioning(root: &Path, base: &str) -> Result<ExitCode, String> {
     })
 }
 
-/// Where the published crate lives, relative to the repository root.
+fn without_version_line(manifest: &[u8]) -> String {
+    String::from_utf8_lossy(manifest)
+        .lines()
+        .filter(|line| !line.trim_start().starts_with("version"))
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+const fn bump_label(bump: Bump) -> &'static str {
+    match bump {
+        Bump::None => "none",
+        Bump::Patch => "patch",
+        Bump::Release => "release",
+        Bump::Year => "year",
+    }
+}
+
+/// Where the published crate lives, relative to the repository root. Its
+/// Cargo.toml carries the version of everything.
 const CRATE_DIR: &str = "crates/deepmind-patches";
 
-/// The `package.version` of a `Cargo.toml`.
 fn manifest_version(text: &[u8]) -> Result<LibraryVersion, String> {
     let manifest: toml::Value = toml::from_str(&String::from_utf8_lossy(text))
         .map_err(|error| format!("{CRATE_DIR}/Cargo.toml: {error}"))?;
@@ -378,119 +468,12 @@ fn manifest_version(text: &[u8]) -> Result<LibraryVersion, String> {
         .map_err(|error| format!("{CRATE_DIR}/Cargo.toml: {error}"))
 }
 
-fn crate_version(root: &Path, base: &str) -> Result<ExitCode, String> {
+fn current_version(root: &Path) -> Result<LibraryVersion, String> {
     let manifest_path = Path::new(CRATE_DIR).join("Cargo.toml");
-    let head = manifest_version(
+    manifest_version(
         &std::fs::read(root.join(&manifest_path))
             .map_err(|error| format!("{}: {error}", manifest_path.display()))?,
-    )?;
-    let before = git::show(root, base, &manifest_path)?
-        .map(|text| manifest_version(&text))
-        .transpose()?;
-    let changes = git::changes(root, base)?;
-    let code_changed = changes.iter().any(|(_, path)| path.starts_with(CRATE_DIR));
-    let changelog_changed = changes
-        .iter()
-        .any(|(_, path)| path == Path::new("CHANGELOG.md"));
-    let file = manifest_path.display();
-    let year = current_year();
-
-    let bump = match before {
-        None => Bump::Release,
-        Some(before) if before == head => {
-            if code_changed {
-                let mut expected = format!(
-                    "{} for a fix or {} for an addition",
-                    head.next(Bump::Patch, head.year),
-                    head.next(Bump::Release, head.year),
-                );
-                if year > head.year {
-                    let _ = write!(
-                        expected,
-                        ", or {} to start the year",
-                        head.next(Bump::Year, year)
-                    );
-                }
-                println!(
-                    "::error file={file}::{CRATE_DIR} changed but the crate version is still {head}. Set version = {expected}."
-                );
-                println!("crate_bump=none");
-                return Ok(ExitCode::FAILURE);
-            }
-            Bump::None
-        }
-        Some(before) => match before.step_to(head, year) {
-            Ok(bump) => {
-                if !code_changed {
-                    println!(
-                        "::warning file={file}::the crate version went from {before} to {head} but nothing under {CRATE_DIR} changed. A release publishes it anyway."
-                    );
-                }
-                bump
-            }
-            Err(error) => {
-                println!("::error file={file}::{error}");
-                println!("crate_bump=none");
-                return Ok(ExitCode::FAILURE);
-            }
-        },
-    };
-    if code_changed && !changelog_changed {
-        println!(
-            "::warning file=CHANGELOG.md::{CRATE_DIR} changed without a line in CHANGELOG.md."
-        );
-    }
-    let label = match bump {
-        Bump::None => "none",
-        Bump::Patch => "patch",
-        Bump::Release => "release",
-        Bump::Year => "year",
-    };
-    println!("crate_version={head}");
-    println!("crate_bump={label}");
-    if let Ok(output) = std::env::var("GITHUB_OUTPUT") {
-        use std::io::Write as _;
-        if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(output) {
-            let _ = writeln!(file, "crate_version={head}");
-            let _ = writeln!(file, "crate_bump={label}");
-        }
-    }
-    Ok(ExitCode::SUCCESS)
-}
-
-fn next_version(root: &Path, bump: BumpArg) -> Result<LibraryVersion, String> {
-    let year = current_year();
-    let latest = git::latest_tag(root)?;
-    let current = match &latest {
-        Some(tag) => LibraryVersion::from_tag(tag).map_err(|error| error.to_string())?,
-        None => {
-            return Ok(LibraryVersion {
-                year,
-                release: 0,
-                patch: 0,
-            });
-        }
-    };
-    let bump = match bump {
-        BumpArg::Patch => Bump::Patch,
-        BumpArg::Release => Bump::Release,
-        BumpArg::Year => Bump::Year,
-        BumpArg::Auto => {
-            let tag = latest.as_deref().unwrap_or_default();
-            let changes = git::changes(root, tag)?;
-            classify(
-                changes
-                    .iter()
-                    .map(|(change, path)| (*change, path.as_path())),
-            )
-        }
-    };
-    if bump == Bump::None {
-        return Err(format!(
-            "nothing that ships changed since {current}; pass --bump to force"
-        ));
-    }
-    Ok(current.next(bump, year))
+    )
 }
 
 fn history(root: &Path, library: &Library) -> Result<BTreeMap<String, Vec<HistoryEntry>>, String> {

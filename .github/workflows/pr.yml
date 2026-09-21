@@ -28,7 +28,7 @@ jobs:
         run: cargo build -p validate --release --locked
       - name: Validate every patch
         run: target/release/validate check --github
-      - name: Check patch versions and classify the change
+      - name: Check every version moved as the change needs
         id: versioning
         if: github.event_name == 'pull_request'
         run: target/release/validate versioning --base "origin/${{ github.base_ref }}"
@@ -42,11 +42,11 @@ jobs:
             echo
             target/release/validate pr-summary --base "origin/${{ github.base_ref }}"
             echo
-            echo "Library bump this change needs: \`${{ steps.versioning.outputs.bump }}\`"
+            echo "This change needs a \`${{ steps.versioning.outputs.needs }}\` bump; the version is \`${{ steps.versioning.outputs.version }}\`."
           } > summary.md
           cat summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Comment on the pull request
-        if: github.event_name == 'pull_request' && steps.versioning.outputs.bump != 'none'
+        if: github.event_name == 'pull_request' && steps.versioning.outputs.needs != 'none'
         uses: actions/github-script@v9
         with:
           script: |
@@ -134,8 +134,8 @@ jobs:
       - name: Unused dependencies
         run: cargo machete
 
-  crate-version:
-    name: Crate version
+  version:
+    name: Version
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
@@ -146,20 +146,24 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Build the tool
         run: cargo build -p validate --release --locked
-      - name: Check the version moved one step if the crate changed
+      - name: Check every version moved as the change needs
         id: version
-        run: target/release/validate crate-version --base "origin/${{ github.base_ref }}"
-      - name: Check the new version is not on crates.io yet
-        if: steps.version.outputs.crate_bump != 'none'
+        run: target/release/validate versioning --base "origin/${{ github.base_ref }}"
+      - name: Check the new version is not released yet
+        if: steps.version.outputs.bump != 'none'
         run: |
-          VERSION="${{ steps.version.outputs.crate_version }}"
+          VERSION="${{ steps.version.outputs.version }}"
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "::error file=crates/deepmind-patches/Cargo.toml::v$VERSION is already tagged"
+            exit 1
+          fi
           STATUS="$(curl -s -o /dev/null -w '%{http_code}' -A 'deepmind-patches check workflow' "https://crates.io/api/v1/crates/deepmind-patches/$VERSION")"
           if [ "$STATUS" = "200" ]; then
             echo "::error file=crates/deepmind-patches/Cargo.toml::deepmind-patches $VERSION is already on crates.io"
             exit 1
           fi
       - name: Check the public API moved no further than the version says
-        if: steps.version.outputs.crate_bump != 'none'
+        if: steps.version.outputs.bump != 'none' && steps.version.outputs.code_changed == 'true'
         uses: obi1kenobi/cargo-semver-checks-action@v2
         with:
           package: deepmind-patches
