@@ -494,6 +494,10 @@ impl Scan {
             "taplo.toml",
             "rustfmt.toml",
             "clippy.toml",
+            // Release outputs, gitignored, present while the workflow runs.
+            "index.toml",
+            "patches.tar.gz",
+            "demos.tar.gz",
         ];
         let entries =
             std::fs::read_dir(&self.root).map_err(|error| Error::io(&self.root, error))?;

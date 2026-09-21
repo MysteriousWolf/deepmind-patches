@@ -531,7 +531,7 @@ fn pr_summary(root: &Path, base: &str) -> Result<String, String> {
             patch.category,
             patch.meta.version,
             if d.effects.is_empty() {
-                "none".to_owned()
+                "bypassed".to_owned()
             } else {
                 d.effects.join(", ")
             },

@@ -97,7 +97,7 @@ receive the bits and draw them however they like; nothing here renders.
 CI reads these from the program and writes them to the index:
 
 - category
-- effect algorithms loaded in the four engines
+- effect mode, and the algorithms in the four engines
 - arpeggiator on, and its mode
 - polyphony mode and unison voice count
 - how many of the eight modulation routings are used

@@ -117,7 +117,9 @@ pub struct IndexPatch {
     /// Demos, default first.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub demos: Vec<IndexDemo>,
-    /// Effect algorithms loaded, in engine order.
+    /// `Insert`, `Send` or `Bypass`.
+    pub fx_mode: String,
+    /// Effect algorithms in engine order, empty when bypassed.
     pub effects: Vec<String>,
     /// Arpeggiator on.
     pub arp: bool,
@@ -226,6 +228,7 @@ impl Index {
                             about: demo.about.clone(),
                         })
                         .collect(),
+                    fx_mode: derived.fx_mode.clone(),
                     effects: derived.effects.clone(),
                     arp: derived.arp,
                     arp_mode: derived.arp_mode.clone(),

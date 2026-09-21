@@ -50,7 +50,8 @@ model       = "DeepMind 12"
 firmware    = "1.1.5"
 
 # Derived from the program bytes:
-effects     = ["Chorus", "Stereo Delay", "Room Reverb"]
+fx_mode     = "Insert"
+effects     = ["Chorus", "Stereo Delay", "Room Reverb", "TC Deep Reverb"]
 arp         = false
 polyphony   = "Poly"
 unison      = 1

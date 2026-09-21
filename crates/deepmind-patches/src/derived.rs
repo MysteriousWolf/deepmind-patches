@@ -16,8 +16,11 @@ pub struct Derived {
     /// The raw category byte, for the message when it is not one of the twelve.
     #[serde(skip)]
     pub category_value: u8,
-    /// Full names of the algorithms loaded in the four effect engines, in
-    /// engine order, skipping empty engines.
+    /// `Insert`, `Send` or `Bypass`. The instrument always has an algorithm
+    /// in every engine; this is what says whether they are heard.
+    pub fx_mode: String,
+    /// Full names of the algorithms in the four effect engines, in engine
+    /// order. Empty when the effects are bypassed.
     pub effects: Vec<String>,
     /// Whether the arpeggiator is on.
     pub arp: bool,
@@ -41,11 +44,19 @@ impl Derived {
     #[must_use]
     pub fn of(program: &Program) -> Self {
         let category_value = program.get(ParamId::ProgramCategory);
-        let effects = Engine::ALL
-            .iter()
-            .filter_map(|engine| program.algorithm(*engine))
-            .map(|algorithm| algorithm.full_name.to_owned())
-            .collect();
+        let fx_mode_value = program.get(ParamId::FxMode);
+        let fx_mode = ParamId::FxMode
+            .label(u16::from(fx_mode_value))
+            .map_or_else(|| format!("value {fx_mode_value}"), str::to_owned);
+        let effects = if fx_mode == "Bypass" {
+            Vec::new()
+        } else {
+            Engine::ALL
+                .iter()
+                .filter_map(|engine| program.algorithm(*engine))
+                .map(|algorithm| algorithm.full_name.to_owned())
+                .collect()
+        };
         let arp = program.get(ParamId::ArpOnOff) != 0;
         let arp_mode = arp
             .then(|| ParamId::ArpMode.label(u16::from(program.get(ParamId::ArpMode))))
@@ -75,6 +86,7 @@ impl Derived {
         Self {
             category: Category::from_value(category_value),
             category_value,
+            fx_mode,
             effects,
             arp,
             arp_mode,
@@ -108,6 +120,10 @@ mod tests {
         assert!(derived.arp_mode.is_some());
         assert_eq!(derived.routings, 1);
         assert_eq!(derived.polyphony, "Unison 4");
+        assert_eq!(derived.fx_mode, "Insert");
+        assert_eq!(derived.effects.len(), 4);
+        program.set(ParamId::FxMode, 2).unwrap();
+        assert!(Derived::of(&program).effects.is_empty());
         assert_eq!(derived.unison, 4);
         assert!(!derived.sequencer);
     }
