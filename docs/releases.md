@@ -25,27 +25,25 @@ holding last week's index fetches last week's files, never a mixture.
 
 ## Cutting a release
 
-`main` is always releasable: every merge passed the validator. A release is a
-manual step so several pull requests can batch into one:
+There is nothing to cut. The version is `package.version` in
+`crates/deepmind-patches/Cargo.toml`, every pull request that ships something
+moves it, and the **Release** workflow runs on every push to `main`:
 
-1. Run the **Release** workflow. Leave the bump on `auto`, or force `release`
-   or `patch`. The year is taken from the date.
-2. The workflow validates, computes the next version from the last tag and
-   the changes since, builds the index and the archives, writes notes listing
-   added and updated patches, and publishes the release under the new tag.
+1. Read the version. If `v<version>` is already tagged, stop.
+2. Validate, build the index and the archives, write notes listing the
+   patches added and updated since the previous tag.
+3. Publish the GitHub release under the new tag.
+4. Publish the crate at the same version, unless crates.io already has it.
 
-Nothing is committed back. The tag is the record.
+Nothing is committed back. The tag is the record. The workflow can be run by
+hand to retry a failed publish.
 
 ## The crate
 
-The release workflow also publishes `crates/deepmind-patches` when the
-version in its `Cargo.toml` is not on crates.io yet. Bump it on the same
-`YY.RELEASE.PATCH` scheme, on its own counter, in the pull request that changes
-the code. A release that changed no code publishes nothing.
-
-CI holds the pull request to that. `validate crate-version` fails when
-`crates/deepmind-patches/` changed and the version did not, or when the new
-version is not exactly one step from `main`:
+The crate shares the version. CI holds every pull request to it:
+`validate versioning` fails when something that ships changed and the version
+did not, when the bump is smaller than the change needs, or when the new
+version is already tagged or on crates.io. For code, the step means:
 
 | Step | For |
 | --- | --- |

@@ -73,19 +73,3 @@ pub fn log(root: &Path, path: &Path) -> Result<Vec<String>, String> {
         .map(str::to_owned)
         .collect())
 }
-
-/// The newest `v*` tag reachable from HEAD, if any.
-pub fn latest_tag(root: &Path) -> Result<Option<String>, String> {
-    let output = Command::new("git")
-        .arg("-C")
-        .arg(root)
-        .args(["describe", "--tags", "--match", "v*", "--abbrev=0"])
-        .output()
-        .map_err(|error| format!("git: {error}"))?;
-    if !output.status.success() {
-        return Ok(None);
-    }
-    Ok(Some(
-        String::from_utf8_lossy(&output.stdout).trim().to_owned(),
-    ))
-}

@@ -1,13 +1,13 @@
 name: Release
 
+# The version of everything is `package.version` in
+# crates/deepmind-patches/Cargo.toml. Every merge to main that moved it is a
+# release: tag it, build the assets, publish the crate. A merge that did not
+# move it does nothing here. Re-runnable by hand for a failed publish.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
-    inputs:
-      bump:
-        description: Which part to bump. auto reads it from the changes since the last tag. The year is always taken from the date.
-        type: choice
-        default: auto
-        options: [auto, release, patch]
 
 permissions:
   contents: write
@@ -25,22 +25,29 @@ jobs:
       - name: Build the tool
         run: cargo build -p validate --release --locked
 
-      - name: Validate
-        run: target/release/validate check --github
-
-      - name: Compute the version
+      - name: Read the version
         id: version
         run: |
-          VERSION="$(target/release/validate next-version --bump "${{ inputs.bump }}")"
+          VERSION="$(target/release/validate version)"
           PREVIOUS="$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)"
+          if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+            echo "v$VERSION is already released; nothing to do"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
-          echo "Releasing v$VERSION (previous: ${PREVIOUS:-none})"
+
+      - name: Validate
+        if: steps.version.outputs.release == 'true'
+        run: target/release/validate check --github
 
       # Everything built goes to the runner's temp folder. The validator
       # refuses files it does not know at the checkout root, and the notes
       # step validates the checkout again.
       - name: Build the index
+        if: steps.version.outputs.release == 'true'
         run: >
           target/release/validate index
           --out "$RUNNER_TEMP/index.toml"
@@ -48,11 +55,13 @@ jobs:
           --commit "$GITHUB_SHA"
 
       - name: Bundle
+        if: steps.version.outputs.release == 'true'
         run: |
           tar czf "$RUNNER_TEMP/patches.tar.gz" presets
           tar czf "$RUNNER_TEMP/demos.tar.gz" demos
 
       - name: Write the notes
+        if: steps.version.outputs.release == 'true'
         run: |
           if [ -n "${{ steps.version.outputs.previous }}" ]; then
             SINCE="--since ${{ steps.version.outputs.previous }}"
@@ -64,6 +73,7 @@ jobs:
           cat "$RUNNER_TEMP/notes.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Publish the release
+        if: steps.version.outputs.release == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -74,14 +84,13 @@ jobs:
             --notes-file "$RUNNER_TEMP/notes.md" \
             "$RUNNER_TEMP/index.toml" "$RUNNER_TEMP/patches.tar.gz" "$RUNNER_TEMP/demos.tar.gz"
 
-      # The crate has its own version. It is published when the version in
-      # its Cargo.toml is not on crates.io yet, so a release that changed no
-      # code publishes nothing.
-      - name: Publish the crate if its version is new
+      # Same version, same rule: published when crates.io does not have it.
+      - name: Publish the crate
+        if: steps.version.outputs.release == 'true'
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: |
-          VERSION="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "deepmind-patches") | .version')"
+          VERSION="${{ steps.version.outputs.version }}"
           STATUS="$(curl -s -o /dev/null -w '%{http_code}' -A 'deepmind-patches release workflow' "https://crates.io/api/v1/crates/deepmind-patches/$VERSION")"
           if [ "$STATUS" = "200" ]; then
             echo "deepmind-patches $VERSION is already on crates.io; not publishing"

@@ -13,7 +13,11 @@
    [docs/format.md](docs/format.md); the minimum is below.
 6. Optionally record up to 20 seconds of it and put the MP3 under `demos/` in
    the same tree. Format in [demos/README.md](demos/README.md).
-7. Open a pull request. CI names each problem by file and line.
+7. Bump `version` in `crates/deepmind-patches/Cargo.toml`: the middle
+   number for a new patch, the last number for a change to an existing one.
+   Run `cargo check` so `Cargo.lock` follows. This is the version of the
+   whole library; merging releases it.
+8. Open a pull request. CI names each problem by file and line.
 
 The minimum `.toml`:
 
@@ -41,8 +45,10 @@ writes both files for you, with the program stored as A1.
 
 ## Update a patch
 
-Edit the files in place. If the `.syx` bytes change, bump `version` by one. If
-only the `.toml` changes, leave `version` alone. CI checks both.
+Edit the files in place. If the `.syx` bytes change, bump the patch's own
+`version` by one; if only the `.toml` changes, leave it alone. Either way bump
+the last number of the library version in `crates/deepmind-patches/Cargo.toml`.
+CI checks all of it.
 
 ## What CI checks
 
@@ -66,7 +72,9 @@ Run it yourself with `cargo run -p validate -- check`. Every rule:
     folders and the root documents.
 14. Icons are seven rows of seven `#` or `.` characters, and not blank. Every
     category and every vocabulary term has one under `resources/icons/`.
-15. `version` is bumped when the `.syx` bytes changed since `main`.
+15. A patch's `version` is bumped when its `.syx` bytes changed since `main`,
+    and the library version in `Cargo.toml` moved by at least what the change
+    needs: the middle number for new patches, the last for anything else.
 16. Unknown `.toml` fields are refused. Anything the `.syx` already says is
     derived, never typed.
 
@@ -99,8 +107,8 @@ advisories and licences, `cargo machete` for unused dependencies, `typos` on
 the text, and `actionlint` on the workflows. `Cargo.lock` is committed, so a
 dependency change goes in with the lock file it produced.
 
-A change under `crates/deepmind-patches/` must bump `version` in its
-`Cargo.toml` by exactly one step on the `YY.RELEASE.PATCH` scheme, see
+A change under `crates/deepmind-patches/` bumps the same version, by the step
+its API change needs, see
 [docs/releases.md](docs/releases.md#the-crate), and gets a line in
 `CHANGELOG.md`. CI compares the public API with `main` using
 `cargo semver-checks` and refuses a bump smaller than the change: an added
