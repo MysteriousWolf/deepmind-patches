@@ -19,7 +19,7 @@ jobs:
     name: Patches
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
@@ -47,7 +47,7 @@ jobs:
           cat summary.md >> "$GITHUB_STEP_SUMMARY"
       - name: Comment on the pull request
         if: github.event_name == 'pull_request' && steps.versioning.outputs.bump != 'none'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -68,15 +68,15 @@ jobs:
     name: TOML formatting
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: uncenter/setup-taplo@v1
+      - uses: actions/checkout@v7
+      - uses: uncenter/setup-taplo@v2
       - run: taplo fmt --check
 
   rust:
     name: Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -97,7 +97,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo test --workspace --all-features --locked
@@ -106,7 +106,7 @@ jobs:
     name: Builds on the minimum Rust
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Read rust-version from Cargo.toml
         id: msrv
         run: |
@@ -123,7 +123,7 @@ jobs:
     name: Dependencies
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Advisories, licences, bans and sources
         uses: EmbarkStudios/cargo-deny-action@v2
         with:
@@ -139,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
@@ -170,7 +170,7 @@ jobs:
     name: Workflows and spelling
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Lint the workflows
         uses: raven-actions/actionlint@v2
       - name: Spelling
@@ -180,7 +180,7 @@ jobs:
     name: API reference is current
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Regenerate docs/api
