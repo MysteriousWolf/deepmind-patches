@@ -1,5 +1,5 @@
-# Seq
-about = "A row of steps at different heights."
+# sequence
+about = "A row of steps."
 icon = [
   ".......",
   ".......",

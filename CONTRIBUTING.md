@@ -4,9 +4,11 @@
 
 1. Save the sound on the instrument or from your editor.
 2. Name it on the instrument. Those sixteen characters become the filename.
-3. Set its category on the instrument. That is the folder it goes in.
-4. Put the `.syx` in `presets/<Category>/`, or in one collection folder inside
-   it. Name it `Name - author.syx`.
+3. Set its category on the instrument. That decides the folder: the
+   instrument's `SFX` is `presets/Sound Effects/`, `Perc` is
+   `presets/Percussion/`. The table in [README.md](README.md) maps all twelve.
+4. Put the `.syx` in that folder, or in one collection folder inside it. Name
+   it `Name - author.syx`.
 5. Write `Name - author.toml` beside it. Fields are in
    [docs/format.md](docs/format.md); the minimum is below.
 6. Optionally record up to 20 seconds of it and put the MP3 under `demos/` in
@@ -52,7 +54,7 @@ Run it yourself with `cargo run -p validate -- check`. Every rule:
 3. Every vocabulary term is in `taxonomy.toml`.
 4. The `.syx` holds exactly one program dump.
 5. It is stored as bank A, program 1. `validate normalise` rewrites it.
-6. Its category byte is one of the twelve and equals its folder.
+6. Its category byte is one of the twelve and matches its folder.
 7. Its stored name equals the `.toml` name.
 8. The filename stem equals `Name - author`, cleaned of `/ \ : * ? " < > |`.
 9. No two patches in one folder share a name and an author.
@@ -62,7 +64,8 @@ Run it yourself with `cargo run -p validate -- check`. Every rule:
     128 kbit/s constant, 44.1 kHz, stereo, at most 20 seconds and 350 KB.
 13. Nothing sits outside `presets/`, `demos/`, `resources/`, the tooling
     folders and the root documents.
-14. Icons are seven rows of seven `#` or `.` characters, and not blank.
+14. Icons are seven rows of seven `#` or `.` characters, and not blank. Every
+    category and every vocabulary term has one under `resources/icons/`.
 15. `version` is bumped when the `.syx` bytes changed since `main`.
 16. Unknown `.toml` fields are refused. Anything the `.syx` already says is
     derived, never typed.
@@ -72,8 +75,10 @@ if you can: a unison patch behaves differently on a DeepMind 6.
 
 ## Propose a vocabulary term
 
-Add it to `taxonomy.toml` with a one-line description, in its own pull
-request. Terms are lowercase words.
+Add it to `taxonomy.toml` with a one-line description, and its 7x7 icon under
+`resources/icons/<axis>/<term>.toml`, in its own pull request. Terms are
+lowercase words. Then run `cargo run -p validate -- icons --write docs/icons.md`
+so the preview stays current.
 
 ## Tooling changes
 

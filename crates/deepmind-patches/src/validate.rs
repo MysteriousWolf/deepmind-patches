@@ -209,6 +209,37 @@ fn check_icons(scan: &Scan, findings: &mut Vec<Finding>) {
             ));
         }
     }
+    let Some(taxonomy) = &scan.taxonomy else {
+        return;
+    };
+    for axis in Axis::ALL {
+        let dir = Path::new(RESOURCES_DIR).join("icons").join(axis.name());
+        for term in taxonomy.axis(axis).keys() {
+            match scan.icons.term(axis, term) {
+                None => findings.push(
+                    Finding::error(dir.join(format!("{term}.toml")), format!("{axis} term {term:?} has no icon"))
+                        .hint("Every term in taxonomy.toml has a 7x7 icon. Add one in the same pull request."),
+                ),
+                Some(icon) if icon.is_blank() => {
+                    findings.push(Finding::error(dir.join(format!("{term}.toml")), "icon is blank"));
+                }
+                Some(_) => {}
+            }
+        }
+        for term in scan.icons.axis(axis).keys() {
+            if !taxonomy.contains(axis, term) {
+                findings.push(
+                    Finding::error(
+                        dir.join(format!("{term}.toml")),
+                        format!("{term:?} is not a {axis} term"),
+                    )
+                    .hint(
+                        "Icons are named after terms in taxonomy.toml. Remove it or add the term.",
+                    ),
+                );
+            }
+        }
+    }
 }
 
 fn check_strays(scan: &Scan, findings: &mut Vec<Finding>) {
@@ -256,8 +287,11 @@ fn check_slot(
     let category = Category::from_name(&slot.category_dir);
     if category.is_none() {
         findings.push(
-            Finding::error(any_path.clone(), format!("folder {:?} is not a category", slot.category_dir))
-                .hint("The folders under presets/ are the instrument's twelve categories, spelled its way."),
+            Finding::error(
+                any_path.clone(),
+                format!("folder {:?} is not a category", slot.category_dir),
+            )
+            .hint("The folders under presets/ are the twelve categories as README.md lists them."),
         );
     }
     if slot.extra_depth > 0 {

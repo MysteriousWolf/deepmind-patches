@@ -11,7 +11,8 @@ presets/Bass/Acid Growl - nyx.toml
 
 Exactly one program dump, stored as bank A, program 1. The slot means nothing
 here; every librarian asks where to put a patch. The category byte inside the
-program is the folder the file sits in, and the name stored in the program is
+program decides the folder the file sits in, under the readable names the
+README lists (`SFX` is `Sound Effects/`), and the name stored in the program is
 the `name` in the `.toml`.
 
 ## The `.toml`
@@ -89,8 +90,10 @@ one, under `demos/` in the same folder tree as the patch. `variant` is at most
 ### Icons
 
 `#` is lit, `.` is unlit, row one is the top, the first character is the left.
-Category icons in `resources/icons/categories/` use the same format. Hosts
-receive the bits and draw them however they like; nothing here renders.
+Category, badge and vocabulary icons under `resources/icons/` use the same
+format, one file per name, with a one-line `about`. Hosts receive the bits and
+draw them however they like; nothing here renders. `docs/icons.md` is a text
+preview of the whole set.
 
 ## Derived, never typed
 

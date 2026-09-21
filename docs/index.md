@@ -23,6 +23,10 @@ Bass = [".......", ".......", "#......", "#.#....", "#.#.#..", "#.#.#.#", ".....
 arp = ["...#...", "..###..", ".#.#.#.", "...#...", ".#.#.#.", "..###..", "...#..."]
 # ...
 
+[icons.genre]                   # and icons.mood, icons.timbre, icons.role: one per term
+techno = ["#.#.#.#", ".......", ".......", "#.#.#.#", "#.#.#.#", "#.#.#.#", "#.#.#.#"]
+# ...
+
 [palette.category]              # resources/palette.toml, verbatim
 Bass = "#E4572E"
 # ...
@@ -33,7 +37,7 @@ name        = "Acid Growl"
 author      = "nyx"
 version     = 2
 about       = "Resonant 303-ish bass that opens under velocity."
-category    = "Bass"
+category    = "Bass"              # the folder name: "Sound Effects", not "SFX"
 file        = "presets/Bass/Acid Growl - nyx.syx"
 sha256      = "9f2b1c..."
 fingerprint = "e3b0c4..."

@@ -720,6 +720,10 @@ fn render_icons(scan: &Scan) -> String {
     };
     section("Categories", &scan.icons.categories);
     section("Badges", &scan.icons.badges);
+    section("Genre", &scan.icons.genre);
+    section("Mood", &scan.icons.mood);
+    section("Timbre", &scan.icons.timbre);
+    section("Role", &scan.icons.role);
     out
 }
 

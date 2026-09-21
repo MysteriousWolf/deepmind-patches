@@ -20,7 +20,7 @@ use crate::fingerprint::{Fingerprint, sha256_hex};
 use crate::icon::Icon;
 use crate::meta::PatchMeta;
 use crate::slug;
-use crate::taxonomy::Taxonomy;
+use crate::taxonomy::{Axis, Taxonomy};
 use crate::validate::{Finding, Severity};
 use crate::{DEMOS_DIR, PRESETS_DIR, RESOURCES_DIR, TAXONOMY_FILE};
 
@@ -35,7 +35,8 @@ pub struct IconFile {
     pub about: Option<String>,
 }
 
-/// The icons a checkout carries: one per category, plus badges.
+/// The icons a checkout carries: one per category, one per vocabulary term,
+/// plus badges. Each map is one folder under `resources/icons/`.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub struct Icons {
     /// Keyed by category name. Complete in a valid checkout.
@@ -44,13 +45,72 @@ pub struct Icons {
     /// Keyed by file stem: `arp`, `seq`, `unison`, `fx`.
     #[serde(default)]
     pub badges: BTreeMap<String, Icon>,
+    /// Keyed by genre term. Complete in a valid checkout.
+    #[serde(default)]
+    pub genre: BTreeMap<String, Icon>,
+    /// Keyed by mood term. Complete in a valid checkout.
+    #[serde(default)]
+    pub mood: BTreeMap<String, Icon>,
+    /// Keyed by timbre term. Complete in a valid checkout.
+    #[serde(default)]
+    pub timbre: BTreeMap<String, Icon>,
+    /// Keyed by role term. Complete in a valid checkout.
+    #[serde(default)]
+    pub role: BTreeMap<String, Icon>,
 }
 
 impl Icons {
+    /// The folders under `resources/icons/`, which are the fields here.
+    pub const GROUPS: [&'static str; 6] =
+        ["categories", "badges", "genre", "mood", "timbre", "role"];
+
     /// The icon for a category, if present.
     #[must_use]
     pub fn category(&self, category: Category) -> Option<&Icon> {
         self.categories.get(category.name())
+    }
+
+    /// The icons for one vocabulary axis.
+    #[must_use]
+    pub const fn axis(&self, axis: Axis) -> &BTreeMap<String, Icon> {
+        match axis {
+            Axis::Genre => &self.genre,
+            Axis::Mood => &self.mood,
+            Axis::Timbre => &self.timbre,
+            Axis::Role => &self.role,
+        }
+    }
+
+    /// The icon for a vocabulary term, if present.
+    #[must_use]
+    pub fn term(&self, axis: Axis, term: &str) -> Option<&Icon> {
+        self.axis(axis).get(term)
+    }
+
+    /// One group by folder name.
+    #[must_use]
+    pub fn group(&self, name: &str) -> Option<&BTreeMap<String, Icon>> {
+        match name {
+            "categories" => Some(&self.categories),
+            "badges" => Some(&self.badges),
+            "genre" => Some(&self.genre),
+            "mood" => Some(&self.mood),
+            "timbre" => Some(&self.timbre),
+            "role" => Some(&self.role),
+            _ => None,
+        }
+    }
+
+    fn group_mut(&mut self, name: &str) -> Option<&mut BTreeMap<String, Icon>> {
+        match name {
+            "categories" => Some(&mut self.categories),
+            "badges" => Some(&mut self.badges),
+            "genre" => Some(&mut self.genre),
+            "mood" => Some(&mut self.mood),
+            "timbre" => Some(&mut self.timbre),
+            "role" => Some(&mut self.role),
+            _ => None,
+        }
     }
 }
 
@@ -318,7 +378,7 @@ impl Scan {
     }
 
     fn read_icons(&mut self) {
-        for group in ["categories", "badges"] {
+        for group in Icons::GROUPS {
             let dir = self.root.join(RESOURCES_DIR).join("icons").join(group);
             let Ok(entries) = std::fs::read_dir(&dir) else {
                 continue;
@@ -342,12 +402,9 @@ impl Scan {
                     });
                 match parsed {
                     Ok(file) => {
-                        let map = if group == "categories" {
-                            &mut self.icons.categories
-                        } else {
-                            &mut self.icons.badges
-                        };
-                        map.insert(key, file.icon);
+                        if let Some(map) = self.icons.group_mut(group) {
+                            map.insert(key, file.icon);
+                        }
                     }
                     Err(message) => self.problem(relative, message),
                 }

@@ -8,6 +8,8 @@
 | `patches.tar.gz` | The `presets/` folder. |
 | `demos.tar.gz` | The `demos/` folder. Optional download. |
 
+The logo and banner in `docs/` are the repository's own mark, drawn in the same case as deepmind-midi's and deepmind-control's.
+
 URLs, none of which touch the GitHub API or need a token:
 
 | | |
