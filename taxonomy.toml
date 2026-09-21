@@ -1,0 +1,69 @@
+# The vocabularies a patch may draw on. A term not in here fails validation.
+# Free text cannot be filtered on, styled by or counted.
+#
+# The instrument's twelve categories are not here. They come out of the .syx
+# file itself and are mirrored by the folder.
+#
+# Terms are lowercase words. Adding one is a pull request that touches only
+# this file.
+
+[genre]
+ambient = "Drifting, atmospheric, no fixed pulse."
+techno = "Four-to-the-floor, machine music."
+house = "Warmer and more swung than techno."
+trance = "Long builds, wide supersaws."
+dnb = "Drum and bass, jungle, breakbeat."
+synthwave = "Eighties pastiche, analogue nostalgia."
+industrial = "Harsh, metallic, distorted."
+film = "Score and trailer work."
+game = "Chiptune, game audio."
+jazz = "Electric piano, upright, brushed."
+funk = "Clavinet, slap, wah."
+pop = "Radio-facing, clean."
+rock = "Organ, distorted lead, power."
+classical = "Orchestral emulation."
+experimental = "Anything with no other home."
+
+[mood]
+dark = "Minor, low, closed."
+bright = "Open, high, major."
+warm = "Soft top end, gentle saturation."
+cold = "Clinical, glassy, digital."
+aggressive = "Loud, distorted, forward."
+calm = "Slow, quiet, still."
+dreamy = "Blurred, heavily modulated, reverberant."
+tense = "Unresolved, dissonant."
+playful = "Bouncy, rhythmic, light."
+melancholic = "Sad without being dark."
+epic = "Large, wide, cinematic."
+
+[timbre]
+analogue = "Drifting, imperfect, warm."
+digital = "Exact, clean, bell-like."
+gritty = "Distorted, saturated, noisy."
+clean = "No distortion, no noise."
+metallic = "Inharmonic, ringing."
+glassy = "Bright, brittle, transparent."
+wooden = "Hollow, damped, resonant."
+vocal = "Formant, throaty, speech-like."
+noisy = "Noise is a component, not a defect."
+hollow = "Square-ish, missing a fundamental."
+rich = "Many partials, detuned, thick."
+thin = "Few partials, narrow."
+
+[role]
+lead = "Plays the tune."
+bass = "Plays the bottom."
+pad = "Held chords."
+pluck = "Short, pitched, decaying."
+stab = "One hit, chordal."
+drone = "One note, forever."
+texture = "Not pitched, not rhythmic."
+fx = "Sound effect rather than instrument."
+key = "Piano, electric piano, clav."
+brass = "Horn emulation."
+string = "Bowed emulation."
+bell = "Struck, inharmonic, ringing."
+arp = "Arpeggiator is the point."
+sequence = "Sequencer is the point."
+percussion = "Drums, hits, clicks."

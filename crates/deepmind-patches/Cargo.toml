@@ -1,0 +1,31 @@
+[package]
+name = "deepmind-patches"
+version = "26.0.0"
+description = "Read, validate, fingerprint and index the shared DeepMind patch library."
+readme = "README.md"
+keywords = ["deepmind", "behringer", "synthesizer", "presets", "sysex"]
+categories = ["multimedia::audio", "parser-implementations"]
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[features]
+default = []
+# Downloading releases and fetching single files. Pulls in an HTTP client.
+fetch = ["dep:ureq", "dep:flate2", "dep:tar"]
+
+[dependencies]
+deepmind-midi.workspace = true
+serde.workspace = true
+toml.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
+spdx.workspace = true
+walkdir.workspace = true
+ureq = { workspace = true, optional = true }
+flate2 = { workspace = true, optional = true }
+tar = { workspace = true, optional = true }
+
+[lints]
+workspace = true

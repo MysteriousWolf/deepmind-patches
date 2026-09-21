@@ -1,0 +1,30 @@
+# Named colours, carried in the index for hosts that want to agree on them.
+# Hex sRGB. Nothing here renders anything; a host decides what to do with it.
+
+# The instrument's display: light dots on a dark blue field.
+[lcd]
+background = "#0B1D3A"
+lit = "#DDEBFF"
+unlit = "#173058"
+
+# One colour per category, for chips and badges.
+[category]
+Bass = "#E4572E"
+Pad = "#7B9EDB"
+Lead = "#F2C14E"
+Mono = "#A0A7B4"
+Poly = "#8FC7A8"
+Stab = "#F28C28"
+SFX = "#C86BD6"
+Arp = "#4FB0C6"
+Seq = "#5DB56A"
+Perc = "#D95F5F"
+Ambient = "#6E86C8"
+Modular = "#B58B5C"
+
+# One colour per vocabulary axis, for filter groups.
+[axis]
+genre = "#7B9EDB"
+mood = "#C86BD6"
+timbre = "#F2C14E"
+role = "#8FC7A8"
