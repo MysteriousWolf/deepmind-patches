@@ -1,6 +1,6 @@
 [package]
 name = "deepmind-patches"
-version = "26.0.0"
+version = "26.1.0"
 description = "Read, validate, fingerprint and index the shared DeepMind patch library."
 readme = "README.md"
 keywords = ["deepmind", "behringer", "synthesizer", "presets", "sysex"]

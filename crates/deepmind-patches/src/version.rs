@@ -82,6 +82,38 @@ impl LibraryVersion {
             Bump::Year => unreachable!("handled above"),
         }
     }
+
+    /// The bump that takes `self` to `next`, if `next` is exactly one step
+    /// away.
+    ///
+    /// This is the rule for a version that lives in a file, like the crate's:
+    /// a change bumps the patch, the release, or starts the given year at
+    /// `yy.0.0`. Anything else, including a skipped number, going backwards,
+    /// or a year that is not this year, is an error saying what was expected.
+    pub fn step_to(self, next: Self, year: u32) -> Result<Bump, Error> {
+        let candidates = [
+            (Bump::Patch, self.next(Bump::Patch, self.year)),
+            (Bump::Release, self.next(Bump::Release, self.year)),
+            (Bump::Year, self.next(Bump::Year, year)),
+        ];
+        candidates
+            .iter()
+            .find(|(bump, version)| *version == next && (*bump != Bump::Year || year > self.year))
+            .map(|(bump, _)| *bump)
+            .ok_or_else(|| {
+                let mut expected: Vec<String> = candidates[..2]
+                    .iter()
+                    .map(|(_, version)| version.to_string())
+                    .collect();
+                if year > self.year {
+                    expected.push(candidates[2].1.to_string());
+                }
+                Error::Version(format!(
+                    "{next} is not one step from {self}; expected {}",
+                    expected.join(", ")
+                ))
+            })
+    }
 }
 
 impl FromStr for LibraryVersion {
@@ -199,6 +231,34 @@ mod tests {
         assert_eq!(version.next(Bump::Release, 26).to_string(), "26.4.0");
         assert_eq!(version.next(Bump::Patch, 27).to_string(), "27.0.0");
         assert_eq!(version.next(Bump::Year, 26).to_string(), "26.0.0");
+    }
+
+    #[test]
+    fn steps() {
+        let version: LibraryVersion = "26.3.1".parse().unwrap();
+        let step = |next: &str, year| version.step_to(next.parse().unwrap(), year);
+        assert_eq!(step("26.3.2", 26).unwrap(), Bump::Patch);
+        assert_eq!(step("26.4.0", 26).unwrap(), Bump::Release);
+        assert_eq!(step("27.0.0", 27).unwrap(), Bump::Year);
+        // Still the same year on the calendar and in the version.
+        assert_eq!(step("26.3.2", 27).unwrap(), Bump::Patch);
+        for (bad, year) in [
+            ("26.3.1", 26),
+            ("26.3.3", 26),
+            ("26.4.1", 26),
+            ("26.5.0", 26),
+            ("26.3.0", 26),
+            ("25.0.0", 26),
+            ("27.0.0", 26),
+            ("28.0.0", 27),
+            ("27.1.0", 27),
+        ] {
+            assert!(step(bad, year).is_err(), "{bad} in {year}");
+        }
+        let message = step("26.9.9", 27).unwrap_err().to_string();
+        assert!(message.contains("26.3.2, 26.4.0, 27.0.0"), "{message}");
+        let message = step("26.9.9", 26).unwrap_err().to_string();
+        assert!(message.ends_with("26.3.2, 26.4.0"), "{message}");
     }
 
     #[test]

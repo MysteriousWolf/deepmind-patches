@@ -17,8 +17,6 @@ deepmind-patches = { path = "../../crates/deepmind-patches" }
 deepmind-midi.workspace = true
 clap.workspace = true
 toml.workspace = true
-time.workspace = true
-serde.workspace = true
 
 [lints]
 workspace = true

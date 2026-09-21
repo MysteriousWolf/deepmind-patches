@@ -551,6 +551,8 @@ impl Scan {
             "taplo.toml",
             "rustfmt.toml",
             "clippy.toml",
+            "deny.toml",
+            "_typos.toml",
             // Release outputs, gitignored, present while the workflow runs.
             "index.toml",
             "patches.tar.gz",

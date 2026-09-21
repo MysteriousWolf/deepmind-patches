@@ -1,8 +1,9 @@
 //! CI and contributor tool for the repository.
 //!
-//! Every command runs from the repository root. CI runs `check`, `versioning`
-//! and `fresh`; the release workflow runs `next-version`, `index` and `notes`;
-//! contributors use `new`, `normalise` and `check`.
+//! Every command runs from the repository root. CI runs `check`, `versioning`,
+//! `icons --check` and `crate-version`; the release workflow runs
+//! `next-version`, `index` and `notes`; contributors use `new`, `normalise`
+//! and `check`.
 
 #![cfg_attr(test, allow(clippy::unwrap_used))]
 
@@ -50,6 +51,14 @@ enum Command {
     /// Checks per-patch versions against a base ref and reports the bump the
     /// change needs. Exit 1 when a changed .syx did not bump its version.
     Versioning {
+        /// The ref to compare with, usually origin/main.
+        #[arg(long)]
+        base: String,
+    },
+    /// Checks the crate's version against a base ref: a change under
+    /// crates/deepmind-patches must bump it by exactly one step. Exit 1
+    /// when it did not.
+    CrateVersion {
         /// The ref to compare with, usually origin/main.
         #[arg(long)]
         base: String,
@@ -150,6 +159,7 @@ fn run(cli: Cli) -> Result<ExitCode, String> {
     match cli.command {
         Command::Check { strict, github } => check(&root, strict, github),
         Command::Versioning { base } => versioning(&root, &base),
+        Command::CrateVersion { base } => crate_version(&root, &base),
         Command::NextVersion { bump } => {
             println!("{}", next_version(&root, bump)?);
             Ok(ExitCode::SUCCESS)
@@ -350,6 +360,102 @@ fn versioning(root: &Path, base: &str) -> Result<ExitCode, String> {
     } else {
         ExitCode::SUCCESS
     })
+}
+
+/// Where the published crate lives, relative to the repository root.
+const CRATE_DIR: &str = "crates/deepmind-patches";
+
+/// The `package.version` of a `Cargo.toml`.
+fn manifest_version(text: &[u8]) -> Result<LibraryVersion, String> {
+    let manifest: toml::Value = toml::from_str(&String::from_utf8_lossy(text))
+        .map_err(|error| format!("{CRATE_DIR}/Cargo.toml: {error}"))?;
+    manifest
+        .get("package")
+        .and_then(|package| package.get("version"))
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| format!("{CRATE_DIR}/Cargo.toml has no package.version"))?
+        .parse()
+        .map_err(|error| format!("{CRATE_DIR}/Cargo.toml: {error}"))
+}
+
+fn crate_version(root: &Path, base: &str) -> Result<ExitCode, String> {
+    let manifest_path = Path::new(CRATE_DIR).join("Cargo.toml");
+    let head = manifest_version(
+        &std::fs::read(root.join(&manifest_path))
+            .map_err(|error| format!("{}: {error}", manifest_path.display()))?,
+    )?;
+    let before = git::show(root, base, &manifest_path)?
+        .map(|text| manifest_version(&text))
+        .transpose()?;
+    let changes = git::changes(root, base)?;
+    let code_changed = changes.iter().any(|(_, path)| path.starts_with(CRATE_DIR));
+    let changelog_changed = changes
+        .iter()
+        .any(|(_, path)| path == Path::new("CHANGELOG.md"));
+    let file = manifest_path.display();
+    let year = current_year();
+
+    let bump = match before {
+        None => Bump::Release,
+        Some(before) if before == head => {
+            if code_changed {
+                let mut expected = format!(
+                    "{} for a fix or {} for an addition",
+                    head.next(Bump::Patch, head.year),
+                    head.next(Bump::Release, head.year),
+                );
+                if year > head.year {
+                    let _ = write!(
+                        expected,
+                        ", or {} to start the year",
+                        head.next(Bump::Year, year)
+                    );
+                }
+                println!(
+                    "::error file={file}::{CRATE_DIR} changed but the crate version is still {head}. Set version = {expected}."
+                );
+                println!("crate_bump=none");
+                return Ok(ExitCode::FAILURE);
+            }
+            Bump::None
+        }
+        Some(before) => match before.step_to(head, year) {
+            Ok(bump) => {
+                if !code_changed {
+                    println!(
+                        "::warning file={file}::the crate version went from {before} to {head} but nothing under {CRATE_DIR} changed. A release publishes it anyway."
+                    );
+                }
+                bump
+            }
+            Err(error) => {
+                println!("::error file={file}::{error}");
+                println!("crate_bump=none");
+                return Ok(ExitCode::FAILURE);
+            }
+        },
+    };
+    if code_changed && !changelog_changed {
+        println!(
+            "::warning file=CHANGELOG.md::{CRATE_DIR} changed without a line in CHANGELOG.md."
+        );
+    }
+    let label = match bump {
+        Bump::None => "none",
+        Bump::Patch => "patch",
+        Bump::Release => "release",
+        Bump::Year => "year",
+    };
+    println!("crate_version={head}");
+    println!("crate_bump={label}");
+    if let Ok(output) = std::env::var("GITHUB_OUTPUT") {
+        use std::io::Write as _;
+        if let Ok(mut file) = std::fs::OpenOptions::new().append(true).open(output) {
+            let _ = writeln!(file, "crate_version={head}");
+            let _ = writeln!(file, "crate_bump={label}");
+        }
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn next_version(root: &Path, bump: BumpArg) -> Result<LibraryVersion, String> {
@@ -727,26 +833,69 @@ fn render_icons(scan: &Scan) -> String {
     out
 }
 
+/// Seconds since the Unix epoch, now.
+fn unix_now() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |elapsed| elapsed.as_secs())
+}
+
+/// The proleptic Gregorian date of a Unix timestamp, in UTC.
+///
+/// Howard Hinnant's `civil_from_days`, which is what every date library
+/// does underneath. It keeps the tool off a date crate for three lines of
+/// arithmetic.
+fn civil_date(unix: u64) -> (i64, u32, u32) {
+    let days = i64::try_from(unix / 86_400).unwrap_or(i64::MAX / 4);
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097);
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let day = doy - (153 * mp + 2) / 5 + 1;
+    let month = if mp < 10 { mp + 3 } else { mp - 9 };
+    let year = yoe + era * 400 + i64::from(month <= 2);
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    (year, month as u32, day as u32)
+}
+
+/// The current time as RFC 3339 in UTC, to the second: `2026-09-21T10:31:07Z`.
 fn now() -> String {
-    time::OffsetDateTime::now_utc()
-        .replace_nanosecond(0)
-        .unwrap_or_else(|_| time::OffsetDateTime::now_utc())
-        .format(&time::format_description::well_known::Rfc3339)
-        .unwrap_or_default()
+    let unix = unix_now();
+    let (year, month, day) = civil_date(unix);
+    let seconds = unix % 86_400;
+    format!(
+        "{year:04}-{month:02}-{day:02}T{:02}:{:02}:{:02}Z",
+        seconds / 3600,
+        seconds % 3600 / 60,
+        seconds % 60
+    )
 }
 
 fn today() -> Option<toml::value::Datetime> {
-    let date = time::OffsetDateTime::now_utc().date();
-    format!(
-        "{}-{:02}-{:02}",
-        date.year(),
-        u8::from(date.month()),
-        date.day()
-    )
-    .parse()
-    .ok()
+    let (year, month, day) = civil_date(unix_now());
+    format!("{year:04}-{month:02}-{day:02}").parse().ok()
 }
 
 fn current_year() -> u32 {
-    u32::try_from(time::OffsetDateTime::now_utc().year() % 100).unwrap_or(0)
+    u32::try_from(civil_date(unix_now()).0 % 100).unwrap_or(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::civil_date;
+
+    #[test]
+    fn civil_dates() {
+        assert_eq!(civil_date(0), (1970, 1, 1));
+        assert_eq!(civil_date(86_399), (1970, 1, 1));
+        assert_eq!(civil_date(86_400), (1970, 1, 2));
+        // 2000-02-29 and 2000-03-01, across a leap day in a leap century.
+        assert_eq!(civil_date(951_782_400), (2000, 2, 29));
+        assert_eq!(civil_date(951_868_800), (2000, 3, 1));
+        // 2026-09-21T10:31:07Z.
+        assert_eq!(civil_date(1_789_986_667), (2026, 9, 21));
+        assert_eq!(civil_date(4_102_444_800), (2100, 1, 1));
+    }
 }

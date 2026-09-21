@@ -23,7 +23,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build the tool
-        run: cargo build -p validate --release
+        run: cargo build -p validate --release --locked
 
       - name: Validate
         run: target/release/validate check --github
@@ -81,5 +81,5 @@ jobs:
           if [ "$STATUS" = "200" ]; then
             echo "deepmind-patches $VERSION is already on crates.io; not publishing"
           else
-            cargo publish -p deepmind-patches
+            cargo publish -p deepmind-patches --locked
           fi

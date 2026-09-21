@@ -1,0 +1,7 @@
+# Spelling, checked in CI with `typos`. Add synth vocabulary here, not to the
+# prose.
+[files]
+extend-exclude = ["docs/api/", "*.syx", "*.mp3", "Cargo.lock"]
+
+[default.extend-words]
+formant = "formant"

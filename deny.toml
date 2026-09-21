@@ -1,0 +1,39 @@
+# Dependency policy, checked in CI with `cargo deny check`.
+# https://embarkstudios.github.io/cargo-deny/checks/index.html
+
+[graph]
+all-features = true
+
+[advisories]
+# A crate with an advisory fails the build. Unmaintained and yanked crates
+# are warnings, so they show up without blocking a content change.
+version = 2
+db-urls = ["https://github.com/rustsec/advisory-db"]
+yanked = "warn"
+unmaintained = "workspace"
+
+[licenses]
+version = 2
+# The crate is Apache-2.0, so everything it pulls in must be compatible.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "MIT",
+  "BSD-2-Clause",
+  "BSD-3-Clause",
+  "ISC",
+  "Zlib",
+  "Unicode-3.0",
+  "MPL-2.0",
+  "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.9
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

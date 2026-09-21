@@ -82,7 +82,29 @@ so the preview stays current.
 
 ## Tooling changes
 
-`crates/` and `tools/` are Rust. `cargo fmt`, `cargo clippy --workspace
---all-targets --all-features` and `cargo test --workspace` must pass. TOML is
-formatted with `taplo fmt`. Changes there need a maintainer review; patch
-contributions need only green CI.
+`crates/` and `tools/` are Rust. Before opening the pull request, run what CI
+runs:
+
+```sh
+cargo fmt --all
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-features --locked
+cargo doc --workspace --all-features --no-deps --locked
+taplo fmt
+```
+
+CI also builds on the `rust-version` in `Cargo.toml`, checks `Cargo.lock` is
+current (`--locked`), runs `cargo deny check` against `deny.toml` for
+advisories and licences, `cargo machete` for unused dependencies, `typos` on
+the text, and `actionlint` on the workflows. `Cargo.lock` is committed, so a
+dependency change goes in with the lock file it produced.
+
+A change under `crates/deepmind-patches/` must bump `version` in its
+`Cargo.toml` by exactly one step on the `YY.RELEASE.PATCH` scheme, see
+[docs/releases.md](docs/releases.md#the-crate), and gets a line in
+`CHANGELOG.md`. CI compares the public API with `main` using
+`cargo semver-checks` and refuses a bump smaller than the change: an added
+item needs the release part, a removed or changed one the year.
+
+Changes there need a maintainer review; patch contributions need only green
+CI.

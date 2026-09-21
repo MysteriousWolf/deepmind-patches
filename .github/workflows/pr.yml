@@ -9,6 +9,11 @@ permissions:
   contents: read
   pull-requests: write
 
+# A new push to the same pull request supersedes the run in progress.
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
 jobs:
   patches:
     name: Patches
@@ -20,7 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Build the tool
-        run: cargo build -p validate --release
+        run: cargo build -p validate --release --locked
       - name: Validate every patch
         run: target/release/validate check --github
       - name: Check patch versions and classify the change
@@ -77,11 +82,99 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
-      - run: cargo test --workspace --all-features
-      - run: cargo doc -p deepmind-patches --all-features --no-deps
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo doc --workspace --all-features --no-deps --locked
         env:
           RUSTDOCFLAGS: -D warnings
+      - name: Check the crate packages on its own
+        run: cargo package -p deepmind-patches --locked
+
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo test --workspace --all-features --locked
+
+  msrv:
+    name: Builds on the minimum Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Read rust-version from Cargo.toml
+        id: msrv
+        run: |
+          MSRV="$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "deepmind-patches") | .rust_version')"
+          echo "msrv=$MSRV" >> "$GITHUB_OUTPUT"
+          echo "rust-version is $MSRV"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.msrv }}
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-targets --all-features --locked
+
+  deps:
+    name: Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Advisories, licences, bans and sources
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-machete
+      - name: Unused dependencies
+        run: cargo machete
+
+  crate-version:
+    name: Crate version
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the tool
+        run: cargo build -p validate --release --locked
+      - name: Check the version moved one step if the crate changed
+        id: version
+        run: target/release/validate crate-version --base "origin/${{ github.base_ref }}"
+      - name: Check the new version is not on crates.io yet
+        if: steps.version.outputs.crate_bump != 'none'
+        run: |
+          VERSION="${{ steps.version.outputs.crate_version }}"
+          STATUS="$(curl -s -o /dev/null -w '%{http_code}' -A 'deepmind-patches check workflow' "https://crates.io/api/v1/crates/deepmind-patches/$VERSION")"
+          if [ "$STATUS" = "200" ]; then
+            echo "::error file=crates/deepmind-patches/Cargo.toml::deepmind-patches $VERSION is already on crates.io"
+            exit 1
+          fi
+      - name: Check the public API moved no further than the version says
+        if: steps.version.outputs.crate_bump != 'none'
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: deepmind-patches
+          feature-group: all-features
+          baseline-rev: origin/${{ github.base_ref }}
+
+  workflows:
+    name: Workflows and spelling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Lint the workflows
+        uses: raven-actions/actionlint@v2
+      - name: Spelling
+        uses: crate-ci/typos@v1
 
   api-docs:
     name: API reference is current

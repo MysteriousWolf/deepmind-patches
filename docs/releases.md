@@ -43,6 +43,22 @@ version in its `Cargo.toml` is not on crates.io yet. Bump it on the same
 `YY.RELEASE.PATCH` scheme, on its own counter, in the pull request that changes
 the code. A release that changed no code publishes nothing.
 
+CI holds the pull request to that. `validate crate-version` fails when
+`crates/deepmind-patches/` changed and the version did not, or when the new
+version is not exactly one step from `main`:
+
+| Step | For |
+| --- | --- |
+| `PATCH` + 1 | A fix. Nothing public added or changed. |
+| `RELEASE` + 1, `PATCH` = 0 | Something public added. |
+| `YY` = this year, others 0 | Something public removed or changed, or the first code change of a year. |
+
+Cargo reads the three parts as major, minor and patch, so a host that depends
+on `26.1` is offered every later `26.x` automatically. That is why a breaking
+change needs the year part, even mid-year: `cargo semver-checks` compares the
+public API with `main` and fails a bump that is smaller than the change. CI
+also refuses a version that is already on crates.io.
+
 ## API reference
 
 `docs/api/` is Markdown generated from the crate's rustdoc by
