@@ -632,9 +632,7 @@ fn check_demos(
 }
 
 fn check_mp3(absolute: &Path, relative: &Path, findings: &mut Vec<Finding>) {
-    let size = std::fs::metadata(absolute)
-        .map(|meta| meta.len())
-        .unwrap_or(0);
+    let size = std::fs::metadata(absolute).map_or(0, |meta| meta.len());
     if size > limits::MAX_BYTES {
         findings.push(
             Finding::error(
