@@ -1,0 +1,12 @@
+# TOML formatting, checked in CI. Run `taplo fmt` before committing.
+include = ["**/*.toml"]
+exclude = ["target/**"]
+
+[formatting]
+align_entries = false
+array_trailing_comma = true
+array_auto_expand = false
+array_auto_collapse = false
+column_width = 100
+indent_string = "  "
+reorder_keys = false

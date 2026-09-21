@@ -1,0 +1,8 @@
+name = "Init Perc"
+author = "template"
+version = 1
+about = "Placeholder so the Perc folder, the index and CI have something to run on. Every parameter is at its minimum. Replace it with a real sound."
+licence = "CC0-1.0"
+role = ["percussion"]
+created = 2026-09-21
+tags = ["placeholder"]

@@ -1,0 +1,24 @@
+[package]
+name = "validate"
+version = "0.0.0"
+description = "CI and contributor tool for deepmind-patches."
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "validate"
+path = "src/main.rs"
+
+[dependencies]
+deepmind-patches = { path = "../../crates/deepmind-patches" }
+deepmind-midi.workspace = true
+clap.workspace = true
+toml.workspace = true
+time.workspace = true
+serde.workspace = true
+
+[lints]
+workspace = true

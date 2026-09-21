@@ -1,0 +1,84 @@
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  patches:
+    name: Patches
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the tool
+        run: cargo build -p validate --release
+      - name: Validate every patch
+        run: target/release/validate check --github
+      - name: Check patch versions and classify the change
+        id: versioning
+        if: github.event_name == 'pull_request'
+        run: target/release/validate versioning --base "origin/${{ github.base_ref }}"
+      - name: Check the icon preview is current
+        run: target/release/validate icons --write docs/icons.md --check
+      - name: Summarise changed patches
+        if: github.event_name == 'pull_request'
+        run: |
+          {
+            echo "## Patches in this pull request"
+            echo
+            target/release/validate pr-summary --base "origin/${{ github.base_ref }}"
+            echo
+            echo "Library bump this change needs: \`${{ steps.versioning.outputs.bump }}\`"
+          } > summary.md
+          cat summary.md >> "$GITHUB_STEP_SUMMARY"
+      - name: Comment on the pull request
+        if: github.event_name == 'pull_request' && steps.versioning.outputs.bump != 'none'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('summary.md', 'utf8');
+            const marker = '<!-- validate:pr-summary -->';
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number, per_page: 100,
+            });
+            const mine = comments.find(c => c.body && c.body.startsWith(marker));
+            const full = `${marker}\n${body}`;
+            if (mine) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body: full });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body: full });
+            }
+
+  toml:
+    name: TOML formatting
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: uncenter/setup-taplo@v1
+      - run: taplo fmt --check
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: cargo test --workspace --all-features
+      - run: cargo doc -p deepmind-patches --all-features --no-deps
+        env:
+          RUSTDOCFLAGS: -D warnings

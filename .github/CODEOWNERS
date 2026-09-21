@@ -1,0 +1,10 @@
+# Content pull requests need only green CI. Anything the tooling owns needs a
+# maintainer.
+/crates/           @MysteriousWolf
+/tools/            @MysteriousWolf
+/.github/          @MysteriousWolf
+/taxonomy.toml     @MysteriousWolf
+/resources/        @MysteriousWolf
+/docs/             @MysteriousWolf
+/Cargo.toml        @MysteriousWolf
+/Cargo.lock        @MysteriousWolf

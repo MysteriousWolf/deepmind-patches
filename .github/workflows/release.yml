@@ -1,0 +1,70 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part to bump. auto reads it from the changes since the last tag.
+        type: choice
+        default: auto
+        options: [auto, patch, release, year]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Build the tool
+        run: cargo build -p validate --release
+
+      - name: Validate
+        run: target/release/validate check --github
+
+      - name: Compute the version
+        id: version
+        run: |
+          VERSION="$(target/release/validate next-version --bump "${{ inputs.bump }}")"
+          PREVIOUS="$(git describe --tags --match 'v*' --abbrev=0 2>/dev/null || true)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "previous=$PREVIOUS" >> "$GITHUB_OUTPUT"
+          echo "Releasing v$VERSION (previous: ${PREVIOUS:-none})"
+
+      - name: Build the index
+        run: >
+          target/release/validate index
+          --out index.toml
+          --version "${{ steps.version.outputs.version }}"
+          --commit "$GITHUB_SHA"
+
+      - name: Bundle
+        run: |
+          tar czf patches.tar.gz presets
+          tar czf demos.tar.gz demos
+
+      - name: Write the notes
+        run: |
+          if [ -n "${{ steps.version.outputs.previous }}" ]; then
+            target/release/validate notes --since "${{ steps.version.outputs.previous }}" --version "${{ steps.version.outputs.version }}" > notes.md
+          else
+            target/release/validate notes --version "${{ steps.version.outputs.version }}" > notes.md
+          fi
+          cat notes.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          gh release create "$TAG" \
+            --target "$GITHUB_SHA" \
+            --title "$TAG" \
+            --notes-file notes.md \
+            index.toml patches.tar.gz demos.tar.gz
