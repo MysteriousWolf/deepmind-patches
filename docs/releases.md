@@ -36,8 +36,15 @@ manual step so several pull requests can batch into one:
 
 Nothing is committed back. The tag is the record.
 
-## Publishing the crate
+## The crate
 
-The **Publish crate** workflow runs `cargo publish` for
-`crates/deepmind-patches`. Bump its version in `Cargo.toml` first, on the same
-`YY.RELEASE.PATCH` scheme, on its own counter.
+The release workflow also publishes `crates/deepmind-patches` when the
+version in its `Cargo.toml` is not on crates.io yet. Bump it on the same
+`YY.RELEASE.PATCH` scheme, on its own counter, in the pull request that changes
+the code. A release that changed no code publishes nothing.
+
+## API reference
+
+`docs/api/` is Markdown generated from the crate's rustdoc by
+`tools/api-docs.sh`. CI checks it is current; run the script after changing
+public items.

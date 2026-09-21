@@ -82,3 +82,19 @@ jobs:
       - run: cargo doc -p deepmind-patches --all-features --no-deps
         env:
           RUSTDOCFLAGS: -D warnings
+
+  api-docs:
+    name: API reference is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Regenerate docs/api
+        run: tools/api-docs.sh
+      - name: Compare with what is committed
+        run: |
+          if ! git diff --exit-code --stat docs/api; then
+            echo "::error::docs/api is stale. Run tools/api-docs.sh and commit the result."
+            exit 1
+          fi
